@@ -1,0 +1,68 @@
+{
+  "_help": "Edit this file to change the places you watch and when you get told. Only town names and rough map points are used. No names, emails or postcodes are needed.",
+
+  "locations": [
+    {
+      "id": "home",
+      "name": "Beverley",
+      "who": "Home",
+      "lat": 53.845,
+      "lon": -0.427,
+      "metOfficeRegion": "yh",
+      "healthRegion": "E12000003",
+      "floodRadiusKm": 5,
+      "rabbitChecks": true
+    },
+    {
+      "id": "son",
+      "name": "Sheffield",
+      "who": "Son at uni",
+      "lat": 53.381,
+      "lon": -1.470,
+      "metOfficeRegion": "yh",
+      "healthRegion": "E12000003",
+      "floodRadiusKm": 3,
+      "months": [1, 2, 3, 4, 5, 9, 10, 11, 12]
+    },
+    {
+      "id": "dad",
+      "name": "Mirfield",
+      "who": "Dad",
+      "lat": 53.676,
+      "lon": -1.692,
+      "metOfficeRegion": "yh",
+      "healthRegion": "E12000003",
+      "floodRadiusKm": 3,
+      "vulnerable": true
+    },
+    {
+      "id": "brother",
+      "name": "Selby",
+      "who": "Brother",
+      "lat": 53.784,
+      "lon": -1.067,
+      "metOfficeRegion": "yh",
+      "healthRegion": "E12000003",
+      "floodRadiusKm": 3
+    }
+  ],
+
+  "thresholds": {
+    "_help": "Heads-ups from the forecast. These are not official warnings.",
+    "gustMph": 55,
+    "snowCm": 3,
+    "rainMm": 25,
+    "coldC": -3,
+    "hotC": 28,
+    "rabbitFrostC": -1,
+    "rabbitHeatC": 24,
+    "airQualityEAQI": 60
+  },
+
+  "notifications": {
+    "_help": "Push alerts go through the free ntfy app. Set the topic as a GitHub secret called NTFY_TOPIC, never in this file.",
+    "dailySummaryHour": 7,
+    "sendForecastHeadsUps": true,
+    "tellMeWhenWarningsEnd": true
+  }
+}

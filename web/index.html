@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#14363f">
+<title>Home Alerts</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one phone-width column. Status band, then official warnings, then the four places, then "check yourself" numbers. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #142126;
+  --muted: #56666b;
+  --line: #d8dfde;
+  --brand: #14363f;
+  --brand-ink: #e9f3f2;
+  --accent: #1d6f7a;
+  --red: #c8102e;     --red-bg: #fbe7ea;
+  --amber: #d77a00;   --amber-bg: #fdf0dc;
+  --yellow: #f2c500;  --yellow-bg: #fdf7d9;
+  --info: #4d6f8a;    --info-bg: #e7eef4;
+  --ok: #2f7d4f;      --ok-bg: #e3f2e8;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Roboto Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1719; --surface: #162226; --ink: #e4ecec; --muted: #9aaeb1; --line: #2a3a3e;
+    --brand: #0b2a31; --brand-ink: #dcefee; --accent: #5cc0c9;
+    --red: #ff5a6e; --red-bg: #3a1419; --amber: #ffab3d; --amber-bg: #3a2810; --yellow: #ffd83d; --yellow-bg: #343012;
+    --info: #8fb5d3; --info-bg: #182a38; --ok: #6fcf93; --ok-bg: #12301f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1719; --surface: #162226; --ink: #e4ecec; --muted: #9aaeb1; --line: #2a3a3e;
+  --brand: #0b2a31; --brand-ink: #dcefee; --accent: #5cc0c9;
+  --red: #ff5a6e; --red-bg: #3a1419; --amber: #ffab3d; --amber-bg: #3a2810; --yellow: #ffd83d; --yellow-bg: #343012;
+  --info: #8fb5d3; --info-bg: #182a38; --ok: #6fcf93; --ok-bg: #12301f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font); }
+a { color: var(--accent); }
+.wrap { max-width: 640px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { background: var(--brand); color: var(--brand-ink); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 { margin: 0; font: 700 1.25rem/1.1 var(--font-display); letter-spacing: .02em; text-transform: uppercase; }
+.brand small { display: block; font-size: .78rem; opacity: .8; letter-spacing: 0; text-transform: none; font-family: var(--font); font-weight: 400; }
+button.refresh { flex: none; background: transparent; color: var(--brand-ink); border: 1px solid color-mix(in srgb, var(--brand-ink) 40%, transparent); border-radius: 999px; padding: 6px 14px; font: 600 .85rem var(--font); cursor: pointer; }
+button.refresh:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.example { background: var(--yellow-bg); color: var(--ink); border-bottom: 1px solid var(--line); font-size: .88rem; }
+.example .wrap { padding-block: 8px; }
+
+.band { border-bottom: 1px solid var(--line); background: var(--surface); }
+.band .wrap { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center; padding-block: 18px; }
+.lamp { grid-row: span 2; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font: 800 1.4rem var(--font-display); color: #fff; background: var(--ok); }
+.band[data-level="red"] .lamp { background: var(--red); }
+.band[data-level="amber"] .lamp { background: var(--amber); }
+.band[data-level="yellow"] .lamp { background: var(--yellow); color: #1c1a00; }
+.band h2 { margin: 0; font: 700 1.35rem/1.2 var(--font-display); text-wrap: balance; }
+.band p { margin: 0; color: var(--muted); font-size: .9rem; }
+.band p.stale { color: var(--red); font-weight: 600; }
+
+main .wrap { display: grid; gap: 28px; padding-block: 20px 40px; }
+section h3 { margin: 0 0 10px; font: 700 .78rem var(--font); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.list { display: grid; gap: 10px; }
+.empty { color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 14px; margin: 0; }
+
+.alert { background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--info); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.alert[data-level="red"] { border-left-color: var(--red); }
+.alert[data-level="amber"] { border-left-color: var(--amber); }
+.alert[data-level="yellow"] { border-left-color: var(--yellow); }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: .78rem; color: var(--muted); }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 700 .7rem/1.6 var(--font); text-transform: uppercase; letter-spacing: .06em; background: var(--info-bg); color: var(--info); }
+.chip.red { background: var(--red-bg); color: var(--red); }
+.chip.amber { background: var(--amber-bg); color: var(--amber); }
+.chip.yellow { background: var(--yellow-bg); color: var(--ink); box-shadow: inset 0 0 0 1px var(--yellow); }
+.alert h4 { margin: 0; font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+.alert details { font-size: .9rem; color: var(--muted); }
+.alert details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.alert details p { margin: 6px 0 0; overflow-wrap: anywhere; }
+.alert .go { font-size: .88rem; font-weight: 600; }
+
+.places { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.place { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.place header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.place h4 { margin: 0; font: 700 1.1rem var(--font-display); }
+.place .who { color: var(--muted); font-size: .85rem; }
+.place .count { font-size: .78rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.place .count.warn { background: var(--amber-bg); color: var(--amber); }
+.days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-variant-numeric: tabular-nums; }
+.day { border-radius: 8px; background: var(--bg); padding: 6px 8px; font-size: .82rem; line-height: 1.35; min-width: 0; }
+.day b { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.day .t { font-size: 1rem; font-weight: 700; }
+.day .cold { color: var(--info); }
+.place.off { opacity: .65; }
+
+.checks { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.check { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 14px; border-top: 1px solid var(--line); align-items: center; }
+.check:first-child { border-top: 0; }
+.check strong { font-size: .95rem; }
+.check span { color: var(--muted); font-size: .85rem; grid-column: 1; }
+.check .num { grid-column: 2; grid-row: 1 / span 2; font: 700 1rem var(--mono); text-decoration: none; white-space: nowrap; user-select: all; }
+
+.sources { display: grid; gap: 4px; font-size: .85rem; color: var(--muted); }
+.src { display: flex; gap: 8px; align-items: baseline; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; transform: translateY(1px); }
+.dot.bad { background: var(--red); }
+footer p { font-size: .8rem; color: var(--muted); margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .alert, .place { transition: transform .15s; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 30 28H2Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 12v8" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><circle cx="16" cy="24" r="1.7" fill="currentColor"/></svg>
+      <h1>Home Alerts <small id="sub">Beverley, Sheffield, Mirfield, Selby</small></h1>
+    </div>
+    <button class="refresh" id="refresh" type="button">Refresh</button>
+  </div>
+</header>
+<div class="example" id="example" hidden><div class="wrap"><strong>Example data.</strong> This preview shows made-up warnings so you can see the layout. Your own copy shows live feeds.</div></div>
+
+<div class="band" id="band" data-level="ok">
+  <div class="wrap">
+    <div class="lamp" id="lamp" aria-hidden="true">✓</div>
+    <h2 id="headline">Loading the latest check…</h2>
+    <p id="fresh">&nbsp;</p>
+  </div>
+</div>
+
+<main>
+  <div class="wrap">
+    <section>
+      <h3>Official warnings</h3>
+      <div class="list" id="official"></div>
+    </section>
+
+    <section>
+      <h3>Forecast heads-ups</h3>
+      <div class="list" id="headsups"></div>
+    </section>
+
+    <section>
+      <h3>Places</h3>
+      <div class="places" id="places"></div>
+    </section>
+
+    <section>
+      <h3>Check these yourself</h3>
+      <div class="checks">
+        <div class="check"><strong>Power cut</strong><span>Free from any phone. <a href="https://www.northernpowergrid.com/power-cuts" target="_blank" rel="noopener">Northern Powergrid live map</a></span><a class="num" href="tel:105">105</a></div>
+        <div class="check"><strong>Floodline</strong><span><a href="https://check-for-flooding.service.gov.uk/" target="_blank" rel="noopener">Check for flooding</a></span><a class="num" href="tel:03459881188">0345 988 1188</a></div>
+        <div class="check"><strong>Water supply</strong><span><a href="https://www.yorkshirewater.com/in-your-area/" target="_blank" rel="noopener">Yorkshire Water: in your area</a></span><a class="num" href="tel:03451242424">0345 124 2424</a></div>
+        <div class="check"><strong>Gas leak</strong><span>National Gas Emergency Service</span><a class="num" href="tel:08001119999">0800 111 999</a></div>
+        <div class="check"><strong>Non-emergency police</strong><span>Emergencies: 999</span><a class="num" href="tel:101">101</a></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Sources</h3>
+      <div class="sources" id="sources"></div>
+    </section>
+
+    <footer>
+      <p>Built from public feeds: Met Office, Environment Agency, UKHSA and Open-Meteo. Nothing about you is sent anywhere. This is not an official warning service. If life is at risk, call 999.</p>
+    </footer>
+  </div>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var RANK = { red: 4, amber: 3, yellow: 2, info: 1 };
+  var LABEL = { red: 'Red', amber: 'Amber', yellow: 'Yellow', info: 'Heads-up' };
+  var last = null;
+
+  function ago(iso) {
+    var m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60);
+    return h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+  }
+  function dayName(d, i) {
+    if (i === 0) return 'Today';
+    return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  }
+
+  function alertCard(a) {
+    var level = a.level in RANK ? a.level : 'info';
+    var detail = a.detail ? '<details><summary>Details</summary><p>' + esc(a.detail) + '</p></details>' : '';
+    var places = (a.places || []).join(', ');
+    var host = '';
+    try { host = new URL(a.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    return '<article class="alert" data-level="' + level + '">' +
+      '<div class="meta"><span class="chip ' + level + '">' + LABEL[level] + '</span><span>' + esc(a.source) + '</span>' +
+      (places ? '<span>· ' + esc(places) + '</span>' : '') + (a.stale ? '<span>· from an earlier check</span>' : '') + '</div>' +
+      '<h4>' + esc(a.title) + '</h4>' + detail +
+      (a.url ? '<a class="go" href="' + esc(a.url) + '" target="_blank" rel="noopener">Open on ' + esc(host || 'source') + '</a>' : '') +
+      '</article>';
+  }
+
+  function render(s) {
+    last = s;
+    $('example').hidden = !s.example;
+    var alerts = s.alerts || [];
+    var official = alerts.filter(function (a) { return a.official; });
+    var heads = alerts.filter(function (a) { return !a.official; });
+    var top = official.reduce(function (m, a) { return RANK[a.level] > RANK[m] ? a.level : m; }, 'info');
+
+    var band = $('band');
+    band.dataset.level = official.length ? top : 'ok';
+    $('lamp').textContent = official.length ? String(official.length) : '✓';
+    $('headline').textContent = official.length
+      ? official.length + ' official warning' + (official.length > 1 ? 's' : '') + ' in force'
+      : 'No official warnings for your places';
+    var mins = (Date.now() - new Date(s.generatedAt)) / 60000;
+    var fresh = $('fresh');
+    fresh.textContent = 'Checked ' + ago(s.generatedAt) + (mins > 45 && !s.example ? '. The checker has not run for a while, so this may be out of date.' : '');
+    fresh.className = mins > 45 && !s.example ? 'stale' : '';
+
+    $('official').innerHTML = official.length ? official.map(alertCard).join('') : '<p class="empty">Nothing from the Met Office, Environment Agency or UKHSA for your places right now.</p>';
+    $('headsups').innerHTML = heads.length ? heads.map(alertCard).join('') : '<p class="empty">The next three days look unremarkable.</p>';
+
+    var watching = (s.locations || []).filter(function (l) { return l.watching; }).map(function (l) { return l.name; });
+    if (watching.length) $('sub').textContent = watching.join(', ');
+
+    $('places').innerHTML = (s.locations || []).map(function (l) {
+      var mine = alerts.filter(function (a) { return a.official && (a.places || []).indexOf(l.name) > -1; }).length;
+      var days = (l.forecast || []).map(function (d, i) {
+        return '<div class="day"><b>' + dayName(d.date, i) + '</b><span class="t' + (d.min <= 0 ? ' cold' : '') + '">' + Math.round(d.min) + '° / ' + Math.round(d.max) + '°</span><br>gusts ' + Math.round(d.gust) + ' mph' +
+          (d.snow > 0.4 ? '<br>snow ' + Math.round(d.snow) + ' cm' : d.rain >= 1 ? '<br>rain ' + Math.round(d.rain) + ' mm' : '') + '</div>';
+      }).join('');
+      return '<div class="place' + (l.watching ? '' : ' off') + '"><header><div><h4>' + esc(l.name) + '</h4><div class="who">' + esc(l.who || '') + '</div></div>' +
+        (l.watching ? '<span class="count' + (mine ? ' warn' : '') + '">' + (mine ? mine + ' warning' + (mine > 1 ? 's' : '') : 'Clear') + '</span>' : '<span class="who">Paused this month</span>') + '</header>' +
+        (days ? '<div class="days">' + days + '</div>' : '') + '</div>';
+    }).join('');
+
+    $('sources').innerHTML = Object.keys(s.sources || {}).map(function (k) {
+      var v = s.sources[k];
+      return '<div class="src"><span class="dot' + (v.ok ? '' : ' bad') + '"></span><span>' + esc(k) + (v.ok ? ': working' : ': not answering (' + esc(v.error || 'error') + ')') + '</span></div>';
+    }).join('');
+  }
+
+  function load() {
+    $('refresh').textContent = 'Checking…';
+    return fetch('status.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(render)
+      .catch(function () {
+        if (!last) {
+          $('headline').textContent = 'No check has run yet';
+          $('fresh').textContent = 'Once the checker runs, results appear here. If you have just set this up, give it 15 minutes.';
+        }
+      })
+      .then(function () { $('refresh').textContent = 'Refresh'; });
+  }
+
+  $('refresh').addEventListener('click', load);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
+  setInterval(function () { if (!document.hidden) load(); }, 5 * 60 * 1000);
+  setInterval(function () { if (last) render(last); }, 60 * 1000);
+  load();
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && /github\.io$|localhost/.test(location.hostname)) {
+    try { navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+  }
+})();
+</script>
+</body>
+</html>
