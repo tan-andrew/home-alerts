@@ -134,7 +134,7 @@ await source('UKHSA health alerts', async () => {
         official: true,
         level: status,
         title: `${status[0].toUpperCase() + status.slice(1)} ${word.toLowerCase()} health alert, ${a.geography_name || 'your region'}`,
-        detail: (a.text || '').replace(/\s+/g, ' ').trim().slice(0, 600),
+        detail: decode((a.text || '').replace(/<li[^>]*>/gi, ' • ')).slice(0, 600),
         places: placesFor(l => l.healthRegion === code),
         url: `https://ukhsa-dashboard.data.gov.uk/weather-health-alerts/${kind}`,
         start: a.period_start, end: a.period_end,
