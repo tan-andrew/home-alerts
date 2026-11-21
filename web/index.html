@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <meta name="theme-color" content="#14363f">
 <title>Home Alerts</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -116,6 +118,39 @@ section h3 { margin: 0 0 10px; font: 700 .78rem var(--font); text-transform: upp
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; transform: translateY(1px); }
 .dot.bad { background: var(--red); }
 footer p { font-size: .8rem; color: var(--muted); margin: 0; }
+/* Map */
+.mapwrap { display: grid; gap: 10px; }
+@media (min-width: 900px) { .wrap { max-width: 1100px; } .mapwrap { grid-template-columns: 1fr 330px; align-items: stretch; } }
+.map { position: relative; height: 360px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+@media (min-width: 900px) { .map { height: 460px; } }
+#map { position: absolute; inset: 0; }
+.leaflet-container { font: inherit; background: var(--bg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(185deg) brightness(.85) contrast(.9) saturate(.6); } }
+:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(185deg) brightness(.85) contrast(.9) saturate(.6); }
+.leaflet-tooltip.lbl { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: none; font-weight: 700; font-size: .78rem; padding: 1px 6px; }
+.leaflet-tooltip.lbl::before { display: none; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
+.leaflet-popup-content { margin: 10px 12px; font-size: .85rem; line-height: 1.4; }
+.leaflet-control-attribution { font-size: .65rem; background: color-mix(in srgb, var(--surface) 85%, transparent) !important; color: var(--muted); }
+.leaflet-control-attribution a { color: var(--accent); }
+.legend { position: absolute; z-index: 500; left: 10px; top: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; font-size: .78rem; max-width: calc(100% - 70px); }
+.legend b { font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.legend div { display: flex; justify-content: space-between; gap: 12px; }
+.legend span:last-child { font-weight: 700; }
+.near { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.near .eyebrow { font: 700 .68rem var(--font); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.near h3 { margin: 0; font: 700 1.35rem/1.15 var(--font-display); text-transform: none; letter-spacing: 0; color: var(--ink); }
+.pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick button { font: 600 .8rem var(--font); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.pick button[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.pick button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .9rem; align-items: baseline; }
+.row:first-child { border-top: 0; }
+.row .v { text-align: right; font-weight: 700; color: var(--ok); }
+.row .v.red { color: var(--red); } .row .v.amber { color: var(--amber); } .row .v.yellow { color: var(--ink); } .row .v.info, .row .v.muted { color: var(--muted); }
+.row .v a { font-weight: 600; }
+.near p.note { margin: 0; font-size: .78rem; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) { .alert, .place { transition: transform .15s; } }
 </style>
 </head>
@@ -139,8 +174,23 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
   </div>
 </div>
 
-<main>
+<main class="wide">
   <div class="wrap">
+    <section class="mapsec">
+      <div class="mapwrap">
+        <div class="map">
+          <div id="map" role="img" aria-label="Map of your places and any flood areas"></div>
+          <div class="legend" id="legend"><b>Right now</b></div>
+        </div>
+        <aside class="near" id="near">
+          <div class="eyebrow">Near you right now</div>
+          <h3 id="nearName">Beverley</h3>
+          <div class="pick" id="pick"></div>
+          <div class="rows" id="nearRows"></div>
+          <p class="note">Tap a place on the map or above to switch. Rings show how far out flood warnings are checked.</p>
+        </aside>
+      </div>
+    </section>
     <section>
       <h3>Official warnings</h3>
       <div class="list" id="official"></div>
@@ -252,7 +302,84 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       var v = s.sources[k];
       return '<div class="src"><span class="dot' + (v.ok ? '' : ' bad') + '"></span><span>' + esc(k) + (v.ok ? ': working' : ': not answering (' + esc(v.error || 'error') + ')') + '</span></div>';
     }).join('');
+
+    try { drawMap(s); } catch (e) { console.error(e); }
+    renderNear(s);
   }
+
+
+  // ---------- map ----------
+  var LCOL = function (lv) { var c = getComputedStyle(document.documentElement); return c.getPropertyValue('--' + ({ red: 'red', amber: 'amber', yellow: 'yellow', ok: 'ok' }[lv] || 'info')).trim(); };
+  var map = null, layer = null, polyCache = {}, chosen = null;
+  try { chosen = localStorage.getItem('ha-place'); } catch (e) {}
+  function worst(list) { return list.reduce(function (m, a) { return RANK[a.level] > (RANK[m] || 0) ? a.level : m; }, null); }
+  function forPlace(s, name, src) { return (s.alerts || []).filter(function (a) { return a.official && (a.places || []).indexOf(name) > -1 && (!src || a.source === src); }); }
+
+  function drawMap(s) {
+    var locs = (s.locations || []).filter(function (l) { return l.lat != null && l.watching; });
+    if (!window.L || !locs.length) { document.querySelector('.mapsec').hidden = !locs.length; if (!window.L) document.querySelector('.map').hidden = true; return; }
+    if (!map) {
+      map = L.map('map', { zoomSnap: 0.25, zoomControl: false, attributionControl: true, scrollWheelZoom: false });
+      L.control.zoom({ position: 'topright' }).addTo(map);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 15, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+      map.fitBounds(L.latLngBounds(locs.map(function (l) { return [l.lat, l.lon]; })), { paddingTopLeft: [40, 120], paddingBottomRight: [100, 40] });
+    }
+    if (layer) layer.remove();
+    layer = L.layerGroup().addTo(map);
+    locs.forEach(function (l) {
+      var lv = worst(forPlace(s, l.name)) || 'ok';
+      L.circle([l.lat, l.lon], { radius: (l.radiusKm || 5) * 1000, color: LCOL(lv), weight: 1.5, dashArray: '5 5', fill: false, interactive: false }).addTo(layer);
+      L.circleMarker([l.lat, l.lon], { radius: 8, color: '#fff', weight: 2, fillColor: LCOL(lv), fillOpacity: 1 })
+        .bindTooltip(l.name, { permanent: true, direction: 'right', offset: [8, 0], className: 'lbl' })
+        .on('click', function () { choose(l.name); })
+        .addTo(layer);
+    });
+    (s.alerts || []).filter(function (a) { return a.source === 'Environment Agency'; }).forEach(function (a) {
+      var style = { color: LCOL(a.level), weight: 2, fillColor: LCOL(a.level), fillOpacity: .3 };
+      var pop = '<strong>' + esc(a.title) + '</strong><br><a href="' + esc(a.url) + '" target="_blank" rel="noopener">Open on GOV.UK</a>';
+      var fallback = function () { if (a.where) L.circleMarker([a.where.lat, a.where.lon], { radius: 7, color: style.color, fillColor: style.color, fillOpacity: .6 }).bindPopup(pop).addTo(layer); };
+      if (!a.polygon) return fallback();
+      var p = polyCache[a.polygon] || (polyCache[a.polygon] = fetch(a.polygon).then(function (r) { if (!r.ok) throw 0; return r.json(); }));
+      var target = layer;
+      p.then(function (geo) { if (target === layer) L.geoJSON(geo, { style: style }).bindPopup(pop).addTo(layer); }).catch(function () { delete polyCache[a.polygon]; if (target === layer) fallback(); });
+    });
+    // legend
+    var off = s.alerts || [];
+    var count = function (src) { var l = off.filter(function (a) { return a.official && a.source === src; }); return l.length ? l.length + ' ' + (worst(l) || '') : 'None'; };
+    document.getElementById('legend').innerHTML = '<b>Right now</b>' +
+      '<div><span>Weather warnings</span><span>' + esc(count('Met Office')) + '</span></div>' +
+      '<div><span>Flood</span><span>' + esc(count('Environment Agency')) + '</span></div>' +
+      '<div><span>Health alerts</span><span>' + esc(count('UKHSA')) + '</span></div>';
+  }
+
+  function choose(name) {
+    chosen = name;
+    try { localStorage.setItem('ha-place', name); } catch (e) {}
+    if (last) renderNear(last);
+  }
+
+  function renderNear(s) {
+    var locs = (s.locations || []).filter(function (l) { return l.watching; });
+    if (!locs.length) return;
+    var l = locs.filter(function (x) { return x.name === chosen; })[0] || locs[0];
+    $('nearName').textContent = l.name + (l.who ? ' · ' + l.who : '');
+    $('pick').innerHTML = locs.map(function (x) { return '<button type="button" data-n="' + esc(x.name) + '" aria-pressed="' + (x === l) + '">' + esc(x.name) + '</button>'; }).join('');
+    var row = function (label, list, none) {
+      var lv = worst(list);
+      var v = list.length ? list.map(function (a) { return esc(LABEL[a.level]); }).join(', ') : esc(none);
+      return '<div class="row"><span>' + label + '</span><span class="v ' + (lv || '') + '">' + v + '</span></div>';
+    };
+    var heads = (s.alerts || []).filter(function (a) { return !a.official && (a.places || []).indexOf(l.name) > -1; });
+    var today = (l.forecast || [])[0];
+    $('nearRows').innerHTML =
+      row('Weather warnings', forPlace(s, l.name, 'Met Office'), 'None for Yorkshire & Humber') +
+      row('Flood', forPlace(s, l.name, 'Environment Agency'), 'None within ' + (l.radiusKm || 5) + ' km') +
+      row('Cold or heat health alert', forPlace(s, l.name, 'UKHSA'), 'None') +
+      '<div class="row"><span>Forecast heads-ups</span><span class="v ' + (heads.length ? 'info' : '') + '">' + (heads.length ? heads.length + ' in the next 3 days' : 'None') + '</span></div>' +
+      (today ? '<div class="row"><span>Today</span><span class="v muted">' + Math.round(today.min) + '° to ' + Math.round(today.max) + '°, gusts ' + Math.round(today.gust) + ' mph</span></div>' : '') +
+      '<div class="row"><span>Power cuts</span><span class="v muted"><a href="https://www.northernpowergrid.com/power-cuts" target="_blank" rel="noopener">Check the live map</a> or call 105</span></div>';
+  }
+  $('pick').addEventListener('click', function (e) { var b = e.target.closest('button[data-n]'); if (b) choose(b.getAttribute('data-n')); });
 
   function load() {
     $('refresh').textContent = 'Checking…';
