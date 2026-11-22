@@ -207,12 +207,20 @@ await source('Air quality (Open-Meteo)', async () => {
 // ---------- 6. River levels near chosen places (Environment Agency) ----------
 
 const rivers = [];
+const riverNotes = [];
 await source('River levels', async () => {
   const errors = [];
   for (const l of active.filter(l => l.riverWithinKm)) { try {
     const st = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations?parameter=level&lat=${l.lat}&long=${l.lon}&dist=${l.riverWithinKm}`);
     const dist = s => Math.hypot((s.lat - l.lat) * 111, (s.long - l.lon) * 111 * Math.cos(l.lat * Math.PI / 180));
-    const picks = (st.items || []).filter(s => s.riverName && s.lat).sort((a, b) => dist(a) - dist(b)).slice(0, l.maxRiverStations || 2);
+    let found = (st.items || []).filter(s => s.riverName && s.lat).sort((a, b) => dist(a) - dist(b));
+    if (l.rivers && l.rivers.length) {
+      const wanted = found.filter(s => l.rivers.some(n => (s.riverName + ' ' + (s.label || '')).toLowerCase().includes(String(n).toLowerCase())));
+      if (wanted.length) found = wanted;
+      else riverNotes.push(`No ${l.rivers.join(' or ')} gauge within ${l.riverWithinKm} km of ${l.name}${found.length ? `. Nearest: ${found.slice(0, 3).map(s => s.riverName + ' at ' + s.label).join(', ')}` : ''}`);
+    }
+    if (!found.length) riverNotes.push(`No river gauge within ${l.riverWithinKm} km of ${l.name}`);
+    const picks = found.slice(0, l.maxRiverStations || 2);
     for (const s of picks) { try {
       const ref = s.stationReference || s.notation;
       let detail = s;
@@ -249,6 +257,7 @@ await source('River levels', async () => {
     } catch (e) { errors.push(`${l.name} gauge: ${e.message || e}`); } }
   } catch (e) { errors.push(`${l.name}: ${e.message || e}`); } }
   if (errors.length) console.error('[River levels]', errors.join('; '));
+  riverNotes.push(...errors);
   if (errors.length && !rivers.length) throw new Error(errors[0]);
 });
 
@@ -423,6 +432,7 @@ const status = {
   sourceFails: fails,
   lastSummaryDate,
   rivers,
+  riverNotes,
   recalls,
   bugs,
 };
