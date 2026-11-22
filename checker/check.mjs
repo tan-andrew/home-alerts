@@ -204,6 +204,116 @@ await source('Air quality (Open-Meteo)', async () => {
   }
 });
 
+// ---------- 6. River levels near chosen places (Environment Agency) ----------
+
+const rivers = [];
+await source('River levels', async () => {
+  for (const l of active.filter(l => l.riverWithinKm)) {
+    const st = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations?parameter=level&lat=${l.lat}&long=${l.lon}&dist=${l.riverWithinKm}`);
+    const dist = s => Math.hypot((s.lat - l.lat) * 111, (s.long - l.lon) * 111 * Math.cos(l.lat * Math.PI / 180));
+    const picks = (st.items || []).filter(s => s.riverName && s.lat).sort((a, b) => dist(a) - dist(b)).slice(0, l.maxRiverStations || 2);
+    for (const s of picks) {
+      const ref = s.stationReference || s.notation;
+      let detail = s;
+      try { const d = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations/${ref}`); detail = Array.isArray(d.items) ? d.items[0] : d.items || s; } catch { /* use list data */ }
+      const measures = [].concat(detail.measures || s.measures || []);
+      const m = measures.find(m => m.parameter === 'level' && /stage/i.test(m.qualifier || '')) || measures.find(m => m.parameter === 'level');
+      if (!m || !m['@id']) continue;
+      const r = await get(`${m['@id']}/readings?_sorted&_limit=16`);
+      const vals = (r.items || []).filter(x => typeof x.value === 'number');
+      if (!vals.length) continue;
+      const latest = vals[0];
+      const threeHoursAgo = vals.find(x => new Date(latest.dateTime) - new Date(x.dateTime) >= 2.75 * 3600e3);
+      const scale = typeof detail.stageScale === 'object' ? detail.stageScale : {};
+      const river = {
+        place: l.name, ref, label: detail.label || s.label, river: detail.riverName || s.riverName,
+        level: latest.value, time: latest.dateTime,
+        change3h: threeHoursAgo ? +(latest.value - threeHoursAgo.value).toFixed(2) : null,
+        typicalHigh: scale.typicalRangeHigh ?? null, typicalLow: scale.typicalRangeLow ?? null,
+        url: 'https://check-for-flooding.service.gov.uk/river-and-sea-levels',
+      };
+      rivers.push(river);
+      const name = `${river.river} at ${river.label}`;
+      if (river.typicalHigh != null && river.level > river.typicalHigh) add({
+        id: `river:${ref}:high:${TODAY}`, source: 'River levels', official: false, level: 'info',
+        title: `${name} is above its normal range (${river.level.toFixed(2)} m, normal up to ${river.typicalHigh.toFixed(2)} m)`,
+        detail: 'This is a measurement, not a warning. Any flood alert would come from the Environment Agency.', places: [l.name], url: river.url,
+      });
+      if (river.change3h != null && river.change3h >= (T.riverRiseM3h || 0.3)) add({
+        id: `river:${ref}:rising:${TODAY}`, source: 'River levels', official: false, level: 'info',
+        title: `${name} is rising fast (up ${river.change3h.toFixed(2)} m in 3 hours)`,
+        detail: 'This is a measurement, not a warning. Any flood alert would come from the Environment Agency.', places: [l.name], url: river.url,
+      });
+    }
+  }
+});
+
+// ---------- 7. Food and product recalls ----------
+
+const recalls = [];
+const RECALL_DAYS = 14;
+const since = new Date(NOW - RECALL_DAYS * 864e5);
+await source('Food recalls (FSA)', async () => {
+  const d = await get('https://data.food.gov.uk/food-alerts/id?_limit=30&_sort=-created');
+  for (const a of d.items || []) {
+    const id = a.notation || a['@id'] || a.title;
+    const type = (String(id).match(/-(AA|PRIN|FAFA)-/) || [])[1] || '';
+    if (type === 'AA' && !cfg.recalls?.allergyAlerts) continue;
+    const when = new Date(a.modified || a.created);
+    if (when < since) continue;
+    const risk = [].concat(a.problem || []).map(p => p.riskStatement).filter(Boolean)[0] || '';
+    recalls.push({ id: 'fsa:' + id, kind: type === 'AA' ? 'Allergy alert' : 'Food recall', title: decode(a.title || ''), detail: decode(risk), date: (a.created || '').slice(0, 10), url: a.alertURL || `https://www.food.gov.uk/news-alerts/search/alerts` });
+  }
+});
+await source('Product recalls (GOV.UK)', async () => {
+  const xml = await get('https://www.gov.uk/product-safety-alerts-reports-recalls.atom', 'text');
+  if (!/<feed/i.test(xml)) throw new Error('unexpected reply');
+  for (const [, e] of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/gi)) {
+    const updated = tag(e, 'updated');
+    if (new Date(updated) < since) continue;
+    const link = (e.match(/<link[^>]*href="([^"]+)"/i) || [])[1] || 'https://www.gov.uk/product-safety-alerts-reports-recalls';
+    recalls.push({ id: 'opss:' + (tag(e, 'id') || link), kind: 'Product recall', title: tag(e, 'title'), detail: tag(e, 'summary'), date: updated.slice(0, 10), url: link });
+  }
+});
+recalls.sort((a, b) => b.date.localeCompare(a.date));
+
+// ---------- 8. Flu, COVID-19 and RSV (UKHSA dashboard API, England) ----------
+
+const bugs = [];
+await source('Flu, COVID and RSV (UKHSA)', async () => {
+  const base = 'https://api.ukhsa-dashboard.data.gov.uk/themes/infectious_disease/sub_themes/respiratory/topics';
+  const want = [['Influenza', 'Flu'], ['COVID-19', 'COVID-19'], ['RSV', 'RSV']];
+  let gotAny = false;
+  for (const [topic, label] of want) {
+    try {
+      const geo = `${base}/${topic}/geography_types/Nation/geographies/England/metrics`;
+      const list = await get(`${geo}?format=json`);
+      const names = (Array.isArray(list) ? list : list.results || []).map(x => x.name || x.metric || x).filter(x => typeof x === 'string');
+      const metric = names.find(n => /positivity/i.test(n) && /week/i.test(n)) || names.find(n => /positivity/i.test(n)) || names.find(n => /admission.*rate/i.test(n));
+      if (!metric) continue;
+      let rows = [];
+      for (const yr of [Number(LP.year) - 1, Number(LP.year)]) {
+        const r = await get(`${geo}/${metric}?format=json&page_size=365&year=${yr}&stratum=default&sex=all&age=all`).catch(() => null);
+        rows = rows.concat((r && r.results) || []);
+      }
+      rows = rows.filter(r => r.metric_value != null).sort((a, b) => a.date.localeCompare(b.date));
+      if (!rows.length) continue;
+      const lastRow = rows[rows.length - 1];
+      const twoWeeks = rows.filter(r => new Date(lastRow.date) - new Date(r.date) >= 13 * 864e5).pop();
+      const change = twoWeeks ? lastRow.metric_value - twoWeeks.metric_value : null;
+      bugs.push({
+        label, metric, value: lastRow.metric_value, date: lastRow.date,
+        trend: change == null ? 'unknown' : change > 0.5 ? 'rising' : change < -0.5 ? 'falling' : 'steady',
+        isPercent: /positivity/i.test(metric),
+        spark: rows.slice(-12).map(r => r.metric_value),
+        url: `https://ukhsa-dashboard.data.gov.uk/respiratory-viruses/${topic.toLowerCase()}`,
+      });
+      gotAny = true;
+    } catch (e) { console.error(`[UKHSA ${topic}]`, e.message); }
+  }
+  if (!gotAny) throw new Error('no figures returned');
+});
+
 // ---------- compare with last run, notify, write ----------
 
 let prev = {};
@@ -218,7 +328,7 @@ const firstRun = !prev.generatedAt;
 
 // Keep forecast heads-ups from a source that failed this time, so a blip does not look like an all-clear.
 for (const a of prev.alerts || []) {
-  const srcName = { 'Met Office': 'Met Office warnings', 'Environment Agency': 'Environment Agency floods', UKHSA: 'UKHSA health alerts', Forecast: a.id.startsWith('air:') ? 'Air quality (Open-Meteo)' : 'Forecast (Open-Meteo)' }[a.source];
+  const srcName = { 'Met Office': 'Met Office warnings', 'Environment Agency': 'Environment Agency floods', UKHSA: 'UKHSA health alerts', 'River levels': 'River levels', Forecast: a.id.startsWith('air:') ? 'Air quality (Open-Meteo)' : 'Forecast (Open-Meteo)' }[a.source];
   if (srcName && sources[srcName] && !sources[srcName].ok && !alerts.find(x => x.id === a.id)) alerts.push({ ...a, stale: true });
 }
 
@@ -243,6 +353,12 @@ for (const a of newAlerts) {
     tags: { red: 'rotating_light', amber: 'warning', yellow: 'yellow_circle', info: 'information_source' }[a.level],
     url: a.url,
   });
+}
+const prevRecalls = new Set((prev.recalls || []).map(r => r.id));
+for (const r of recalls) {
+  if (prevRecalls.has(r.id) || !prev.recalls) continue;
+  const want = r.kind === 'Product recall' ? cfg.recalls?.notifyProductRecalls : cfg.recalls?.notifyFoodRecalls;
+  if (want) notes.push({ title: `${r.kind}: ${r.title}`.slice(0, 200), body: r.detail || 'Check if you have this at home.', priority: 2, tags: 'shopping_cart', url: r.url });
 }
 if (N.tellMeWhenWarningsEnd) {
   const nowIds = new Set(alerts.map(a => a.id));
@@ -296,6 +412,9 @@ const status = {
   sources,
   sourceFails: fails,
   lastSummaryDate,
+  rivers,
+  recalls,
+  bugs,
 };
 await fs.mkdir(OUT_DIR, { recursive: true });
 await fs.writeFile(path.join(OUT_DIR, 'status.json'), JSON.stringify(status, null, 1));
