@@ -1,6 +1,5 @@
 {
   "_help": "Edit this file to change the places you watch and when you get told. Only town names and rough map points are used. No names, emails or postcodes are needed.",
-
   "locations": [
     {
       "id": "home",
@@ -12,18 +11,32 @@
       "healthRegion": "E12000003",
       "floodRadiusKm": 5,
       "riverWithinKm": 6,
-      "rabbitChecks": true
+      "rabbitChecks": true,
+      "rivers": [
+        "Hull"
+      ],
+      "riverRiseM3h": false
     },
     {
       "id": "son",
       "name": "Sheffield",
       "who": "Son at uni",
       "lat": 53.381,
-      "lon": -1.470,
+      "lon": -1.47,
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 3,
-      "months": [1, 2, 3, 4, 5, 9, 10, 11, 12]
+      "months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        9,
+        10,
+        11,
+        12
+      ]
     },
     {
       "id": "dad",
@@ -34,8 +47,11 @@
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 3,
-      "riverWithinKm": 4,
-      "vulnerable": true
+      "riverWithinKm": 6,
+      "vulnerable": true,
+      "rivers": [
+        "Calder"
+      ]
     },
     {
       "id": "brother",
@@ -46,11 +62,13 @@
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 3,
-      "riverWithinKm": 3,
-      "riverRiseM3h": false
+      "riverWithinKm": 5,
+      "riverRiseM3h": false,
+      "rivers": [
+        "Ouse"
+      ]
     }
   ],
-
   "thresholds": {
     "_help": "Heads-ups from the forecast. These are not official warnings.",
     "gustMph": 55,
@@ -63,14 +81,12 @@
     "airQualityEAQI": 60,
     "riverRiseM3h": 0.3
   },
-
   "recalls": {
     "_help": "Recalls from the last 14 days show on the page. Choose which also send a quiet notification.",
     "notifyFoodRecalls": true,
     "notifyProductRecalls": false,
     "allergyAlerts": false
   },
-
   "notifications": {
     "_help": "Push alerts go through the free ntfy app. Set the topic as a GitHub secret called NTFY_TOPIC, never in this file.",
     "dailySummaryHour": 7,
