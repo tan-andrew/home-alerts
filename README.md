@@ -15,6 +15,9 @@ You never give anyone your name, email or postcode. The only things it knows are
 | Frost or heat for the rabbits at home | Open-Meteo forecast | No, a heads-up |
 | "Worth a call" nudge for Dad on very cold or hot days | Open-Meteo forecast | No, a heads-up |
 | Poor air quality at home or Dad's | Open-Meteo air quality | No, a heads-up |
+| River levels: Hull (Beverley), Calder (Mirfield), Ouse (Selby), with a heads-up if above normal or rising fast | Environment Agency | Measurement |
+| Food recalls, last 14 days (non-food product recalls can be switched on) | Food Standards Agency, GOV.UK | Yes |
+| Flu, COVID-19 and RSV test positivity in England, with trend | UKHSA data dashboard | Yes |
 
 You also get a morning summary at 7am, a message when a warning ends, and a message if a feed stops answering for about 2 hours.
 
@@ -68,6 +71,28 @@ Go to github.com and sign up. A spare email address is fine. You do not need to 
 1. In Chrome on the phone, open `https://YOUR-GITHUB-NAME.github.io/home-alerts/`.
 2. Tap the **⋮** menu, then **Add to Home screen** (or **Install app**).
 
+### 7. Make the 15-minute checks reliable (recommended)
+
+GitHub's own schedule is often hours late on small repositories. A free outside timer fixes this by pressing "Run workflow" for you.
+
+**Make a limited GitHub key**
+1. On GitHub, click your picture (top right), then **Settings**, **Developer settings**, **Personal access tokens**, **Fine-grained tokens**, **Generate new token**.
+2. Name it `home-alerts timer`. Set the longest expiry offered and put a reminder in your calendar to renew it.
+3. Under **Repository access**, choose **Only select repositories** and pick `home-alerts`.
+4. Under **Permissions**, **Repository permissions**, set **Actions** to **Read and write**. Leave everything else as it is.
+5. Click **Generate token** and copy it. You only see it once.
+
+**Set up the timer**
+1. Sign up free at cron-job.org and click **Create cronjob**.
+2. Title: `Home alerts`. URL: `https://api.github.com/repos/YOUR-GITHUB-NAME/home-alerts/actions/workflows/alerts.yml/dispatches`
+3. Schedule: **Every 15 minutes**.
+4. Open the **Advanced** tab:
+   - Request method: **POST**
+   - Headers: `Accept` = `application/vnd.github+json`, `Authorization` = `Bearer ` followed by your token, `X-GitHub-Api-Version` = `2022-11-28`
+   - Request body: `{"ref":"main"}`
+5. Click **Test run**. A response of **204** means it worked, and a new run appears on your Actions tab.
+6. Click **Create**.
+
 ## Changing things
 
 Edit `config.json` on GitHub (open it, click the pencil, then **Commit changes**). The next run uses your changes.
@@ -75,6 +100,8 @@ Edit `config.json` on GitHub (open it, click the pencil, then **Commit changes**
 - **Places**: add, remove or move a place. Get the map point by long-pressing on Google Maps.
 - **Sheffield in summer**: the `months` list pauses Sheffield from June to August. Remove the line to watch it all year.
 - **How sensitive heads-ups are**: the numbers under `thresholds`.
+- **Rivers**: `riverWithinKm` sets how far to look for gauges, `rivers` names which river to prefer, and `riverRiseM3h: false` turns off the "rising fast" check for tidal rivers like the Hull at Beverley and the Ouse at Selby.
+- **Recalls**: under `recalls`, choose whether food recalls send a quiet notification, whether to include allergy alerts, and `showProductRecalls` to add non-food recalls.
 - **Fewer messages**: set `sendForecastHeadsUps` to `false` to only hear about official warnings. Set `dailySummaryHour` to `null` to stop the morning summary.
 - **Privacy**: the repository and page are public, so anyone who finds them sees which towns you watch. They do not see who you are. You can blank the `who` labels if you prefer.
 
