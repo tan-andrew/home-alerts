@@ -67,6 +67,27 @@
       "rivers": [
         "Ouse"
       ]
+    },
+    {
+      "id": "bs",
+      "name": "Blackburn",
+      "who": "B&S",
+      "lat": 53.748,
+      "lon": -2.482,
+      "metOfficeRegion": "nw",
+      "healthRegion": "E12000002",
+      "floodRadiusKm": 3,
+      "powerCutUrl": "https://www.enwl.co.uk/power-cuts/"
+    },
+    {
+      "id": "songf",
+      "name": "Hartlepool",
+      "who": "Son GF",
+      "lat": 54.686,
+      "lon": -1.212,
+      "metOfficeRegion": "ne",
+      "healthRegion": "E12000001",
+      "floodRadiusKm": 3
     }
   ],
   "thresholds": {
