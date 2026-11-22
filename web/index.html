@@ -151,6 +151,37 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
 .row .v.red { color: var(--red); } .row .v.amber { color: var(--amber); } .row .v.yellow { color: var(--ink); } .row .v.info, .row .v.muted { color: var(--muted); }
 .row .v a { font-weight: 600; }
 .near p.note { margin: 0; font-size: .78rem; color: var(--muted); }
+/* Rivers, bugs, recalls */
+.rivers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.river { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.river .nm { font-weight: 700; overflow-wrap: anywhere; }
+.river .pl { color: var(--muted); font-size: .8rem; }
+.river .lv { font: 700 1.4rem/1 var(--font-display); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.river .lv small { font: 600 .8rem var(--font); color: var(--muted); }
+.river .lv small.up { color: var(--amber); }
+.gauge { position: relative; height: 8px; border-radius: 4px; background: var(--bg); overflow: hidden; }
+.gauge i { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.gauge b { position: absolute; top: -2px; width: 4px; height: 12px; border-radius: 2px; background: var(--accent); transform: translateX(-2px); }
+.gauge.high b { background: var(--amber); }
+.river .cap { font-size: .75rem; color: var(--muted); }
+.bugs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bug { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; text-decoration: none; color: var(--ink); }
+.bug b { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.bug .val { font: 700 1.3rem/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+.bug .tr { font-size: .78rem; font-weight: 700; color: var(--muted); }
+.bug .tr.rising { color: var(--amber); } .bug .tr.falling { color: var(--ok); }
+.bug svg { width: 100%; height: 26px; display: block; }
+.bug svg path { fill: none; stroke: var(--accent); stroke-width: 1.8; }
+.bug svg circle { fill: var(--accent); }
+.subnote { font-size: .78rem; color: var(--muted); margin: 6px 0 0; }
+.recalls { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.rc { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: baseline; }
+.rc:first-child { border-top: 0; }
+.rc .chip { grid-row: span 2; align-self: start; margin-top: 2px; min-width: 5.6em; text-align: center; }
+.rc a { font-weight: 600; font-size: .92rem; overflow-wrap: anywhere; color: var(--ink); text-decoration: none; }
+.rc a:hover { text-decoration: underline; }
+.rc span.d { font-size: .78rem; color: var(--muted); grid-column: 2; }
+.recalls details > summary { padding: 10px 14px; border-top: 1px solid var(--line); cursor: pointer; color: var(--accent); font-weight: 600; font-size: .9rem; }
 @media (prefers-reduced-motion: no-preference) { .alert, .place { transition: transform .15s; } }
 </style>
 </head>
@@ -201,6 +232,23 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       <div class="list" id="headsups"></div>
     </section>
 
+    <section id="riversec" hidden>
+      <h3>River levels</h3>
+      <div class="rivers" id="rivers"></div>
+      <p class="subnote">Latest Environment Agency readings. The shaded band is the river's normal range.</p>
+    </section>
+
+    <section id="bugsec" hidden>
+      <h3>Winter bugs in England</h3>
+      <div class="bugs" id="bugs"></div>
+      <p class="subnote">Share of tests coming back positive, from UKHSA. Rising means more is going around.</p>
+    </section>
+
+    <section id="recallsec" hidden>
+      <h3>Recalls, last 14 days</h3>
+      <div class="recalls" id="recalls"></div>
+    </section>
+
     <section>
       <h3>Places</h3>
       <div class="places" id="places"></div>
@@ -223,7 +271,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
     </section>
 
     <footer>
-      <p>Built from public feeds: Met Office, Environment Agency, UKHSA and Open-Meteo. Nothing about you is sent anywhere. This is not an official warning service. If life is at risk, call 999.</p>
+      <p>Built from public feeds: Met Office, Environment Agency, UKHSA, Food Standards Agency, GOV.UK and Open-Meteo. Nothing about you is sent anywhere. This is not an official warning service. If life is at risk, call 999.</p>
     </footer>
   </div>
 </main>
@@ -305,6 +353,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
 
     try { drawMap(s); } catch (e) { console.error(e); }
     renderNear(s);
+    try { renderExtras(s); } catch (e) { console.error(e); }
   }
 
 
@@ -377,9 +426,55 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       row('Cold or heat health alert', forPlace(s, l.name, 'UKHSA'), 'None') +
       '<div class="row"><span>Forecast heads-ups</span><span class="v ' + (heads.length ? 'info' : '') + '">' + (heads.length ? heads.length + ' in the next 3 days' : 'None') + '</span></div>' +
       (today ? '<div class="row"><span>Today</span><span class="v muted">' + Math.round(today.min) + '° to ' + Math.round(today.max) + '°, gusts ' + Math.round(today.gust) + ' mph</span></div>' : '') +
+      (s.rivers || []).filter(function (r) { return r.place === l.name; }).slice(0, 1).map(function (r) { return '<div class="row"><span>' + esc(r.river) + '</span><span class="v ' + (r.typicalHigh != null && r.level > r.typicalHigh ? 'amber' : 'muted') + '">' + r.level.toFixed(2) + ' m' + (r.change3h != null && Math.abs(r.change3h) >= 0.02 ? (r.change3h > 0 ? ' ▲' : ' ▼') : '') + '</span></div>'; }).join('') +
       '<div class="row"><span>Power cuts</span><span class="v muted"><a href="https://www.northernpowergrid.com/power-cuts" target="_blank" rel="noopener">Check the live map</a> or call 105</span></div>';
   }
   $('pick').addEventListener('click', function (e) { var b = e.target.closest('button[data-n]'); if (b) choose(b.getAttribute('data-n')); });
+
+
+  // ---------- rivers, bugs, recalls ----------
+  function fmtDate(d) { try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); } catch (e) { return d; } }
+  function renderExtras(s) {
+    var rv = s.rivers || [];
+    $('riversec').hidden = !rv.length;
+    $('rivers').innerHTML = rv.map(function (r) {
+      var lo = r.typicalLow, hi = r.typicalHigh, gauge = '';
+      if (lo != null && hi != null && hi > lo) {
+        var min = Math.min(lo, r.level) - (hi - lo) * 0.3, max = Math.max(hi, r.level) + (hi - lo) * 0.3;
+        var pct = function (v) { return ((v - min) / (max - min) * 100).toFixed(1) + '%'; };
+        gauge = '<div class="gauge' + (r.level > hi ? ' high' : '') + '"><i style="left:' + pct(lo) + ';right:calc(100% - ' + pct(hi) + ')"></i><b style="left:' + pct(r.level) + '"></b></div>' +
+          '<div class="cap">Normal ' + lo.toFixed(2) + ' to ' + hi.toFixed(2) + ' m · ' + (r.level > hi ? 'above normal' : r.level < lo ? 'below normal' : 'within normal') + '</div>';
+      }
+      var ch = r.change3h;
+      var chTxt = ch == null ? '' : (Math.abs(ch) < 0.02 ? 'steady' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + ' m in 3 h');
+      return '<div class="river"><div><div class="nm">' + esc(r.river) + ' at ' + esc(r.label) + '</div><div class="pl">Near ' + esc(r.place) + ' · ' + esc(ago(r.time)) + '</div></div>' +
+        '<div class="lv">' + r.level.toFixed(2) + ' m <small class="' + (ch >= 0.15 ? 'up' : '') + '">' + chTxt + '</small></div>' + gauge + '</div>';
+    }).join('');
+
+    var bg = s.bugs || [];
+    $('bugsec').hidden = !bg.length;
+    $('bugs').innerHTML = bg.map(function (b) {
+      var v = b.spark || [], spark = '';
+      if (v.length > 1) {
+        var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), rg = (mx - mn) || 1;
+        var pts = v.map(function (x, i) { return [(i / (v.length - 1) * 96 + 2).toFixed(1), (24 - (x - mn) / rg * 20).toFixed(1)]; });
+        var lastPt = pts[pts.length - 1];
+        spark = '<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><path d="M' + pts.map(function (p) { return p.join(','); }).join('L') + '"/><circle cx="' + lastPt[0] + '" cy="' + lastPt[1] + '" r="2.2"/></svg>';
+      }
+      var arrow = { rising: '▲ rising', falling: '▼ falling', steady: '● steady' }[b.trend] || '';
+      return '<a class="bug" href="' + esc(b.url) + '" target="_blank" rel="noopener"><b>' + esc(b.label) + '</b><span class="val">' + (Math.round(b.value * 10) / 10) + (b.isPercent ? '%' : '') + '</span>' + spark +
+        '<span class="tr ' + esc(b.trend) + '">' + arrow + '</span></a>';
+    }).join('');
+
+    var rc = s.recalls || [];
+    $('recallsec').hidden = !rc.length;
+    var item = function (r) {
+      var cls = r.kind === 'Product recall' ? '' : 'amber';
+      return '<div class="rc"><span class="chip ' + cls + '">' + esc(r.kind === 'Product recall' ? 'Product' : r.kind === 'Allergy alert' ? 'Allergy' : 'Food') + '</span><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><span class="d">' + esc(fmtDate(r.date)) + '</span></div>';
+    };
+    $('recalls').innerHTML = rc.slice(0, 5).map(item).join('') +
+      (rc.length > 5 ? '<details><summary>Show ' + (rc.length - 5) + ' more</summary>' + rc.slice(5).map(item).join('') + '</details>' : '');
+  }
 
   function load() {
     $('refresh').textContent = 'Checking…';
