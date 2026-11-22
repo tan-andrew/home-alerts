@@ -232,19 +232,20 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       <div class="list" id="headsups"></div>
     </section>
 
-    <section id="riversec" hidden>
+    <section id="riversec">
       <h3>River levels</h3>
       <div class="rivers" id="rivers"></div>
       <p class="subnote">Latest Environment Agency readings. The shaded band is the river's normal range.</p>
+      <p class="subnote" id="riverNotes" hidden></p>
     </section>
 
-    <section id="bugsec" hidden>
+    <section id="bugsec">
       <h3>Winter bugs in England</h3>
       <div class="bugs" id="bugs"></div>
       <p class="subnote">Share of tests coming back positive, from UKHSA. Rising means more is going around.</p>
     </section>
 
-    <section id="recallsec" hidden>
+    <section id="recallsec">
       <h3>Recalls, last 14 days</h3>
       <div class="recalls" id="recalls"></div>
     </section>
@@ -434,10 +435,20 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
 
   // ---------- rivers, bugs, recalls ----------
   function fmtDate(d) { try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); } catch (e) { return d; } }
+  function empty(s, names, okText) {
+    names = [].concat(names);
+    var src = s.sources || {};
+    var missing = names.filter(function (n) { return !src[n]; });
+    var bad = names.filter(function (n) { return src[n] && !src[n].ok; });
+    var msg = missing.length === names.length ? 'Waiting for the checker to run with this feature. Give it 15 minutes after updating.'
+      : bad.length ? esc(bad.join(' and ')) + ' is not answering right now: ' + esc(bad.map(function (n) { return src[n].error || 'error'; }).join(', ')) + '.'
+      : okText;
+    return '<p class="empty" style="grid-column:1/-1;margin:0">' + msg + '</p>';
+  }
   function renderExtras(s) {
     var rv = s.rivers || [];
-    $('riversec').hidden = !rv.length;
-    $('rivers').innerHTML = rv.map(function (r) {
+    $('rivers').innerHTML = rv.length ? '' : empty(s, 'River levels', 'No river gauges found near your places yet.');
+    if (rv.length) $('rivers').innerHTML = rv.map(function (r) {
       var lo = r.typicalLow, hi = r.typicalHigh, gauge = '';
       if (lo != null && hi != null && hi > lo) {
         var min = Math.min(lo, r.level) - (hi - lo) * 0.3, max = Math.max(hi, r.level) + (hi - lo) * 0.3;
@@ -451,15 +462,17 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
         '<div class="lv">' + r.level.toFixed(2) + ' m <small class="' + (ch >= 0.15 ? 'up' : '') + '">' + chTxt + '</small></div>' + gauge + '</div>';
     }).join('');
 
+    var rn = s.riverNotes || [];
+    $('riverNotes').hidden = !rn.length;
+    $('riverNotes').textContent = rn.join('. ') + (rn.length ? '.' : '');
     var bg = s.bugs || [];
-    $('bugsec').hidden = !bg.length;
-    $('bugs').innerHTML = bg.map(function (b) {
+    $('bugs').innerHTML = bg.length ? '' : empty(s, 'Flu, COVID and RSV (UKHSA)', 'No figures yet.');
+    if (bg.length) $('bugs').innerHTML = bg.map(function (b) {
       var v = b.spark || [], spark = '';
       if (v.length > 1) {
         var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), rg = (mx - mn) || 1;
         var pts = v.map(function (x, i) { return [(i / (v.length - 1) * 96 + 2).toFixed(1), (24 - (x - mn) / rg * 20).toFixed(1)]; });
-        var lastPt = pts[pts.length - 1];
-        spark = '<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><path d="M' + pts.map(function (p) { return p.join(','); }).join('L') + '"/><circle cx="' + lastPt[0] + '" cy="' + lastPt[1] + '" r="2.2"/></svg>';
+        spark = '<svg viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><path vector-effect="non-scaling-stroke" d="M' + pts.map(function (p) { return p.join(','); }).join('L') + '"/></svg>';
       }
       var arrow = { rising: '▲ rising', falling: '▼ falling', steady: '● steady' }[b.trend] || '';
       return '<a class="bug" href="' + esc(b.url) + '" target="_blank" rel="noopener"><b>' + esc(b.label) + '</b><span class="val">' + (Math.round(b.value * 10) / 10) + (b.isPercent ? '%' : '') + '</span>' + spark +
@@ -467,11 +480,11 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
     }).join('');
 
     var rc = s.recalls || [];
-    $('recallsec').hidden = !rc.length;
     var item = function (r) {
       var cls = r.kind === 'Product recall' ? '' : 'amber';
       return '<div class="rc"><span class="chip ' + cls + '">' + esc(r.kind === 'Product recall' ? 'Product' : r.kind === 'Allergy alert' ? 'Allergy' : 'Food') + '</span><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><span class="d">' + esc(fmtDate(r.date)) + '</span></div>';
     };
+    if (!rc.length) { $('recalls').innerHTML = empty(s, ['Food recalls (FSA)', 'Product recalls (GOV.UK)'], 'No recalls in the last 14 days.'); return; }
     $('recalls').innerHTML = rc.slice(0, 5).map(item).join('') +
       (rc.length > 5 ? '<details><summary>Show ' + (rc.length - 5) + ' more</summary>' + rc.slice(5).map(item).join('') + '</details>' : '');
   }
