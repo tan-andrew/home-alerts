@@ -82,8 +82,9 @@
     "riverRiseM3h": 0.3
   },
   "recalls": {
-    "_help": "Recalls from the last 14 days show on the page. Choose which also send a quiet notification.",
+    "_help": "Food recalls from the last 14 days show on the page. Set showProductRecalls to true to add non-food product safety recalls too.",
     "notifyFoodRecalls": true,
+    "showProductRecalls": false,
     "notifyProductRecalls": false,
     "allergyAlerts": false
   },
