@@ -1,5 +1,7 @@
 name: Home alerts
 
+# Checks the official feeds, updates your phone page and sends any new alerts to the ntfy app.
+# cron-job.org starts this every 15 minutes; GitHub's own schedule below is a backup.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -20,12 +22,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check feeds and send alerts
         run: node checker/check.mjs
@@ -35,13 +34,33 @@ jobs:
       - name: Build the phone page
         run: cp -r web/. site/
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url || steps.retry.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+
       - id: deploy
         uses: actions/deploy-pages@v4
+        continue-on-error: true
 
+      # GitHub sometimes can't see the page bundle for a few seconds. Wait and try once more.
+      - name: Wait before retrying
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+      - id: retry
+        if: steps.deploy.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      # GitHub pauses scheduled jobs in repositories with no changes for 60 days.
       - name: Keep the schedule switched on
         if: always()
         continue-on-error: true
