@@ -102,7 +102,13 @@ await source('Environment Agency floods', async () => {
       const sev = FLOOD[f.severityLevel];
       if (!sev) continue; // 4 = no longer in force
       const areaId = f.floodAreaID || (f.floodArea && f.floodArea.notation) || '';
+      let where = null;
+      if (areaId && !alerts.find(x => x.id === `ea:${areaId}:${f.severityLevel}`)) {
+        try { const fa = await get(`https://environment.data.gov.uk/flood-monitoring/id/floodAreas/${areaId}`); const it = Array.isArray(fa.items) ? fa.items[0] : fa.items; if (it && it.lat) where = { lat: it.lat, lon: it.long }; } catch { /* map just shows the place instead */ }
+      }
       add({
+        polygon: (f.floodArea && f.floodArea.polygon) || (areaId ? `https://environment.data.gov.uk/flood-monitoring/id/floodAreas/${areaId}/polygon` : null),
+        where,
         id: `ea:${areaId}:${f.severityLevel}`,
         source: 'Environment Agency',
         official: true,
@@ -285,7 +291,7 @@ for (const n of toSend) {
 
 const status = {
   generatedAt: NOW.toISOString(),
-  locations: cfg.locations.map(l => ({ id: l.id, name: l.name, who: l.who, watching: active.includes(l), forecast: forecasts[l.id] || null })),
+  locations: cfg.locations.map(l => ({ id: l.id, name: l.name, who: l.who, lat: l.lat, lon: l.lon, radiusKm: l.floodRadiusKm || 5, watching: active.includes(l), forecast: forecasts[l.id] || null })),
   alerts,
   sources,
   sourceFails: fails,
