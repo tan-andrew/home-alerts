@@ -222,25 +222,34 @@ await source('River levels', async () => {
       else riverNotes.push(`No ${l.rivers.join(' or ')} gauge within ${l.riverWithinKm} km of ${l.name}${found.length ? `. Nearest: ${found.slice(0, 3).map(s => s.riverName + ' at ' + s.label).join(', ')}` : ''}`);
     }
     if (!found.length) riverNotes.push(`No river gauge within ${l.riverWithinKm} km of ${l.name}`);
-    const picks = found.slice(0, l.maxRiverStations || 2);
-    for (const s of picks) { try {
+    const wantCount = l.maxRiverStations || 2;
+    let got = 0;
+    const open = found.filter(s => !/closed/i.test(String(s.status || '')));
+    if (found.length && !open.length) riverNotes.push(`All gauges near ${l.name} are closed`);
+    for (const s of open) { if (got >= wantCount) break; try {
       const ref = s.stationReference || s.notation;
       let detail = s;
       try { const d = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations/${ref}`); detail = Array.isArray(d.items) ? d.items[0] : d.items || s; } catch { /* use list data */ }
-      const measures = [].concat(detail.measures || s.measures || []);
-      const m = measures.find(m => m.parameter === 'level' && /stage/i.test(m.qualifier || '')) || measures.find(m => m.parameter === 'level');
-      if (!m || !m['@id']) continue;
-      const r = await get(`${m['@id']}/readings?_sorted&_limit=16`);
-      const vals = (r.items || []).filter(x => typeof x.value === 'number');
-      if (!vals.length) continue;
+      const measures = [].concat(detail.measures || s.measures || []).filter(m => m && m['@id'] && m.parameter === 'level');
+      // Prefer the gauge's own scale (m), then height above sea level (mAOD).
+      measures.sort((a, b) => (/-m$/.test(b['@id']) - /-m$/.test(a['@id'])) || (/stage/i.test(b.qualifier || '') - /stage/i.test(a.qualifier || '')));
+      let vals = [], m = null;
+      for (const cand of measures) {
+        const r = await get(`${cand['@id'].replace(/^http:/, 'https:')}/readings?_sorted&_limit=16`);
+        vals = (r.items || []).filter(x => typeof x.value === 'number');
+        if (vals.length && Date.now() - new Date(vals[0].dateTime) < 2 * 864e5) { m = cand; break; }
+      }
+      if (!m) { riverNotes.push(`${detail.label || s.label} gauge near ${l.name} has no recent readings`); continue; }
+      got++;
+      const aboveSeaLevel = /mAOD$/i.test(m['@id']);
       const latest = vals[0];
       const threeHoursAgo = vals.find(x => new Date(latest.dateTime) - new Date(x.dateTime) >= 2.75 * 3600e3);
       const scale = typeof detail.stageScale === 'object' ? detail.stageScale : {};
       const river = {
         place: l.name, ref, label: detail.label || s.label, river: detail.riverName || s.riverName,
-        level: latest.value, time: latest.dateTime,
+        level: latest.value, time: latest.dateTime, aboveSeaLevel,
         change3h: threeHoursAgo ? +(latest.value - threeHoursAgo.value).toFixed(2) : null,
-        typicalHigh: scale.typicalRangeHigh ?? null, typicalLow: scale.typicalRangeLow ?? null,
+        typicalHigh: aboveSeaLevel ? null : scale.typicalRangeHigh ?? null, typicalLow: aboveSeaLevel ? null : scale.typicalRangeLow ?? null,
         url: 'https://check-for-flooding.service.gov.uk/river-and-sea-levels',
       };
       rivers.push(river);
