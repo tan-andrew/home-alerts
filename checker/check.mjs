@@ -239,7 +239,8 @@ await source('River levels', async () => {
         title: `${name} is above its normal range (${river.level.toFixed(2)} m, normal up to ${river.typicalHigh.toFixed(2)} m)`,
         detail: 'This is a measurement, not a warning. Any flood alert would come from the Environment Agency.', places: [l.name], url: river.url,
       });
-      if (river.change3h != null && river.change3h >= (T.riverRiseM3h || 0.3)) add({
+      const riseLimit = l.riverRiseM3h !== undefined ? l.riverRiseM3h : (T.riverRiseM3h || 0.3);
+      if (riseLimit && river.change3h != null && river.change3h >= riseLimit) add({
         id: `river:${ref}:rising:${TODAY}`, source: 'River levels', official: false, level: 'info',
         title: `${name} is rising fast (up ${river.change3h.toFixed(2)} m in 3 hours)`,
         detail: 'This is a measurement, not a warning. Any flood alert would come from the Environment Agency.', places: [l.name], url: river.url,
