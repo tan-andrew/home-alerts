@@ -437,7 +437,7 @@ for (const n of toSend) {
 
 const status = {
   generatedAt: NOW.toISOString(),
-  locations: cfg.locations.map(l => ({ id: l.id, name: l.name, who: l.who, lat: l.lat, lon: l.lon, radiusKm: l.floodRadiusKm || 5, watching: active.includes(l), forecast: forecasts[l.id] || null })),
+  locations: cfg.locations.map(l => ({ id: l.id, name: l.name, who: l.who, powerCutUrl: l.powerCutUrl, lat: l.lat, lon: l.lon, radiusKm: l.floodRadiusKm || 5, watching: active.includes(l), forecast: forecasts[l.id] || null })),
   alerts,
   sources,
   sourceFails: fails,
