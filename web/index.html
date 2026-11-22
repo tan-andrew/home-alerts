@@ -190,7 +190,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
   <div class="wrap">
     <div class="brand">
       <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 30 28H2Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M16 12v8" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><circle cx="16" cy="24" r="1.7" fill="currentColor"/></svg>
-      <h1>Home Alerts <small id="sub">Beverley, Sheffield, Mirfield, Selby</small></h1>
+      <h1>Home Alerts <small id="sub">Your places</small></h1>
     </div>
     <button class="refresh" id="refresh" type="button">Refresh</button>
   </div>
@@ -422,13 +422,13 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
     var heads = (s.alerts || []).filter(function (a) { return !a.official && (a.places || []).indexOf(l.name) > -1; });
     var today = (l.forecast || [])[0];
     $('nearRows').innerHTML =
-      row('Weather warnings', forPlace(s, l.name, 'Met Office'), 'None for Yorkshire & Humber') +
+      row('Weather warnings', forPlace(s, l.name, 'Met Office'), 'None for this region') +
       row('Flood', forPlace(s, l.name, 'Environment Agency'), 'None within ' + (l.radiusKm || 5) + ' km') +
       row('Cold or heat health alert', forPlace(s, l.name, 'UKHSA'), 'None') +
       '<div class="row"><span>Forecast heads-ups</span><span class="v ' + (heads.length ? 'info' : '') + '">' + (heads.length ? heads.length + ' in the next 3 days' : 'None') + '</span></div>' +
       (today ? '<div class="row"><span>Today</span><span class="v muted">' + Math.round(today.min) + '° to ' + Math.round(today.max) + '°, gusts ' + Math.round(today.gust) + ' mph</span></div>' : '') +
       (s.rivers || []).filter(function (r) { return r.place === l.name; }).slice(0, 1).map(function (r) { return '<div class="row"><span>' + esc(r.river) + '</span><span class="v ' + (r.typicalHigh != null && r.level > r.typicalHigh ? 'amber' : 'muted') + '">' + r.level.toFixed(2) + ' m' + (r.change3h != null && Math.abs(r.change3h) >= 0.02 ? (r.change3h > 0 ? ' ▲' : ' ▼') : '') + '</span></div>'; }).join('') +
-      '<div class="row"><span>Power cuts</span><span class="v muted"><a href="https://www.northernpowergrid.com/power-cuts" target="_blank" rel="noopener">Check the live map</a> or call 105</span></div>';
+      '<div class="row"><span>Power cuts</span><span class="v muted"><a href="' + esc(l.powerCutUrl || 'https://www.northernpowergrid.com/power-cuts') + '" target="_blank" rel="noopener">Check the live map</a> or call 105</span></div>';
   }
   $('pick').addEventListener('click', function (e) { var b = e.target.closest('button[data-n]'); if (b) choose(b.getAttribute('data-n')); });
 
@@ -459,7 +459,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       var ch = r.change3h;
       var chTxt = ch == null ? '' : (Math.abs(ch) < 0.02 ? 'steady' : (ch > 0 ? '▲ ' : '▼ ') + Math.abs(ch).toFixed(2) + ' m in 3 h');
       return '<div class="river"><div><div class="nm">' + esc(r.river) + ' at ' + esc(r.label) + '</div><div class="pl">Near ' + esc(r.place) + ' · ' + esc(ago(r.time)) + '</div></div>' +
-        '<div class="lv">' + r.level.toFixed(2) + ' m <small class="' + (ch >= 0.15 ? 'up' : '') + '">' + chTxt + '</small></div>' + gauge + '</div>';
+        '<div class="lv">' + r.level.toFixed(2) + ' m' + (r.aboveSeaLevel ? ' <small>above sea level</small>' : '') + ' <small class="' + (ch >= 0.15 ? 'up' : '') + '">' + chTxt + '</small></div>' + gauge + '</div>';
     }).join('');
 
     var rn = s.riverNotes || [];
