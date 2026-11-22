@@ -213,7 +213,9 @@ await source('River levels', async () => {
   for (const l of active.filter(l => l.riverWithinKm)) { try {
     const st = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations?parameter=level&lat=${l.lat}&long=${l.lon}&dist=${l.riverWithinKm}`);
     const dist = s => Math.hypot((s.lat - l.lat) * 111, (s.long - l.lon) * 111 * Math.cos(l.lat * Math.PI / 180));
-    let found = (st.items || []).filter(s => s.riverName && s.lat).sort((a, b) => dist(a) - dist(b));
+    const first = v => Array.isArray(v) ? v[0] : v;
+    let found = (st.items || []).map(s => ({ ...s, lat: Number(first(s.lat)), long: Number(first(s.long)), riverName: first(s.riverName) || first(s.label) || '', label: first(s.label) || first(s.riverName) || '' }))
+      .filter(s => s.riverName && !isNaN(s.lat)).sort((a, b) => dist(a) - dist(b));
     if (l.rivers && l.rivers.length) {
       const wanted = found.filter(s => l.rivers.some(n => (s.riverName + ' ' + (s.label || '')).toLowerCase().includes(String(n).toLowerCase())));
       if (wanted.length) found = wanted;
@@ -278,7 +280,7 @@ await source('Food recalls (FSA)', async () => {
     recalls.push({ id: 'fsa:' + id, kind: type === 'AA' ? 'Allergy alert' : 'Food recall', title: decode(a.title || ''), detail: decode(risk), date: (a.created || '').slice(0, 10), url: a.alertURL || `https://www.food.gov.uk/news-alerts/search/alerts` });
   }
 });
-await source('Product recalls (GOV.UK)', async () => {
+if (cfg.recalls?.showProductRecalls) await source('Product recalls (GOV.UK)', async () => {
   const xml = await get('https://www.gov.uk/product-safety-alerts-reports-recalls.atom', 'text');
   if (!/<feed/i.test(xml)) throw new Error('unexpected reply');
   for (const [, e] of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/gi)) {
@@ -347,7 +349,7 @@ for (const a of prev.alerts || []) {
 
 for (const [key, src] of [['rivers', 'River levels'], ['recalls', null], ['bugs', 'Flu, COVID and RSV (UKHSA)']]) {
   const target = { rivers, recalls, bugs }[key];
-  const failed = src ? !sources[src]?.ok : (!sources['Food recalls (FSA)']?.ok && !sources['Product recalls (GOV.UK)']?.ok);
+  const failed = src ? !sources[src]?.ok : (!sources['Food recalls (FSA)']?.ok && (!cfg.recalls?.showProductRecalls || !sources['Product recalls (GOV.UK)']?.ok));
   if (failed && !target.length && Array.isArray(prev[key])) for (const x of prev[key]) target.push({ ...x, stale: true });
 }
 
