@@ -246,7 +246,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
     </section>
 
     <section id="recallsec">
-      <h3>Recalls, last 14 days</h3>
+      <h3>Food recalls, last 14 days</h3>
       <div class="recalls" id="recalls"></div>
     </section>
 
@@ -484,7 +484,7 @@ footer p { font-size: .8rem; color: var(--muted); margin: 0; }
       var cls = r.kind === 'Product recall' ? '' : 'amber';
       return '<div class="rc"><span class="chip ' + cls + '">' + esc(r.kind === 'Product recall' ? 'Product' : r.kind === 'Allergy alert' ? 'Allergy' : 'Food') + '</span><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a><span class="d">' + esc(fmtDate(r.date)) + '</span></div>';
     };
-    if (!rc.length) { $('recalls').innerHTML = empty(s, ['Food recalls (FSA)', 'Product recalls (GOV.UK)'], 'No recalls in the last 14 days.'); return; }
+    if (!rc.length) { $('recalls').innerHTML = empty(s, 'Food recalls (FSA)', 'No food recalls in the last 14 days.'); return; }
     $('recalls').innerHTML = rc.slice(0, 5).map(item).join('') +
       (rc.length > 5 ? '<details><summary>Show ' + (rc.length - 5) + ' more</summary>' + rc.slice(5).map(item).join('') + '</details>' : '');
   }
