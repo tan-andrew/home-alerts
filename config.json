@@ -11,6 +11,7 @@
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 5,
+      "riverWithinKm": 6,
       "rabbitChecks": true
     },
     {
@@ -33,6 +34,7 @@
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 3,
+      "riverWithinKm": 4,
       "vulnerable": true
     },
     {
@@ -56,7 +58,15 @@
     "hotC": 28,
     "rabbitFrostC": -1,
     "rabbitHeatC": 24,
-    "airQualityEAQI": 60
+    "airQualityEAQI": 60,
+    "riverRiseM3h": 0.3
+  },
+
+  "recalls": {
+    "_help": "Recalls from the last 14 days show on the page. Choose which also send a quiet notification.",
+    "notifyFoodRecalls": true,
+    "notifyProductRecalls": false,
+    "allergyAlerts": false
   },
 
   "notifications": {
