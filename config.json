@@ -46,7 +46,8 @@
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
       "floodRadiusKm": 3,
-      "riverWithinKm": 4
+      "riverWithinKm": 3,
+      "riverRiseM3h": false
     }
   ],
 
