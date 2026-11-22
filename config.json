@@ -45,7 +45,8 @@
       "lon": -1.067,
       "metOfficeRegion": "yh",
       "healthRegion": "E12000003",
-      "floodRadiusKm": 3
+      "floodRadiusKm": 3,
+      "riverWithinKm": 4
     }
   ],
 
