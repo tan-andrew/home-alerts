@@ -28,7 +28,7 @@ async function get(url, type = 'json') {
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(20000) });
+      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(30000) });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return type === 'json' ? await r.json() : await r.text();
     } catch (e) { lastErr = e; await new Promise(s => setTimeout(s, 2000)); }
@@ -208,11 +208,12 @@ await source('Air quality (Open-Meteo)', async () => {
 
 const rivers = [];
 await source('River levels', async () => {
-  for (const l of active.filter(l => l.riverWithinKm)) {
+  const errors = [];
+  for (const l of active.filter(l => l.riverWithinKm)) { try {
     const st = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations?parameter=level&lat=${l.lat}&long=${l.lon}&dist=${l.riverWithinKm}`);
     const dist = s => Math.hypot((s.lat - l.lat) * 111, (s.long - l.lon) * 111 * Math.cos(l.lat * Math.PI / 180));
     const picks = (st.items || []).filter(s => s.riverName && s.lat).sort((a, b) => dist(a) - dist(b)).slice(0, l.maxRiverStations || 2);
-    for (const s of picks) {
+    for (const s of picks) { try {
       const ref = s.stationReference || s.notation;
       let detail = s;
       try { const d = await get(`https://environment.data.gov.uk/flood-monitoring/id/stations/${ref}`); detail = Array.isArray(d.items) ? d.items[0] : d.items || s; } catch { /* use list data */ }
@@ -245,8 +246,10 @@ await source('River levels', async () => {
         title: `${name} is rising fast (up ${river.change3h.toFixed(2)} m in 3 hours)`,
         detail: 'This is a measurement, not a warning. Any flood alert would come from the Environment Agency.', places: [l.name], url: river.url,
       });
-    }
-  }
+    } catch (e) { errors.push(`${l.name} gauge: ${e.message || e}`); } }
+  } catch (e) { errors.push(`${l.name}: ${e.message || e}`); } }
+  if (errors.length) console.error('[River levels]', errors.join('; '));
+  if (errors.length && !rivers.length) throw new Error(errors[0]);
 });
 
 // ---------- 7. Food and product recalls ----------
@@ -331,6 +334,12 @@ const firstRun = !prev.generatedAt;
 for (const a of prev.alerts || []) {
   const srcName = { 'Met Office': 'Met Office warnings', 'Environment Agency': 'Environment Agency floods', UKHSA: 'UKHSA health alerts', 'River levels': 'River levels', Forecast: a.id.startsWith('air:') ? 'Air quality (Open-Meteo)' : 'Forecast (Open-Meteo)' }[a.source];
   if (srcName && sources[srcName] && !sources[srcName].ok && !alerts.find(x => x.id === a.id)) alerts.push({ ...a, stale: true });
+}
+
+for (const [key, src] of [['rivers', 'River levels'], ['recalls', null], ['bugs', 'Flu, COVID and RSV (UKHSA)']]) {
+  const target = { rivers, recalls, bugs }[key];
+  const failed = src ? !sources[src]?.ok : (!sources['Food recalls (FSA)']?.ok && !sources['Product recalls (GOV.UK)']?.ok);
+  if (failed && !target.length && Array.isArray(prev[key])) for (const x of prev[key]) target.push({ ...x, stale: true });
 }
 
 const prevMap = new Map((prev.alerts || []).map(a => [a.id, a]));
